@@ -1,3 +1,43 @@
+## 10.2.3
+
+- Allow `analyzer` 10.0.0
+
+## 10.2.2
+
+- Fix multipart datetime code generation (#874)
+
+## 10.2.1
+
+- **Fix analyzer 9.x compatibility**: Remove deprecated Element2 API usage that caused build failures with analyzer 9.0+
+- Support analyzer `'>=8.0.0 <10.0.0'` (supports all 8.x and 9.x versions)
+- Migrate from deprecated analyzer Element2 APIs to stable Element APIs
+
+## 10.2.0
+
+- Extend analyzer dependency range to support analyzer 9.0.0 ('>=7.7.1 <10.0.0')
+- Note: Full analyzer 9.0.0 API migration is pending. For now, the package declares compatibility
+    but may require dependency_overrides to resolve to analyzer 8.x until all dependencies are updated
+- Add Response parameter to logError response data parsing callback
+- Add `format_output` builder option to control generation of `// dart format off/on` comments (default: `true`)
+  - Set `format_output: false` in `build.yaml` to omit format suppressing comments
+  - This allows combining retrofit with other generators (like riverpod) in a more predictable way
+
+## 10.1.0
+
+- Add lean_builder as a dependency to support experimental lean_builder integration
+- Fix package validation errors for lean_builder imports
+- Prepare infrastructure for optional lean_builder support
+
+## 10.0.10
+- Fix null check operator error when using Object type as @Body parameter by @Copilot in #814
+- Fix duplicate null check for nullable optional File parameters in multipart requests by @Copilot in #813
+- Fix List code generation to avoid incorrect Map casting by @Copilot in #811
+- Add support for global headers in @RESTapi annotation by @Copilot in #812
+- Fix @part annotation generating wrong variable reference for MultipartFile by @Copilot in #824
+- Fix nullable typed Map parameters in @Body() annotation by @Copilot in #823
+- Add test coverage for enum arrays in @part annotations by @Copilot in #822
+- Fix Map value deserialization for generic types with type parameters by @Copilot in #825
+
 ## 10.0.8 (Unreleased)
 
 - Add experimental lean_builder support infrastructure

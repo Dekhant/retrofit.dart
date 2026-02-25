@@ -26,6 +26,10 @@ enum Parser {
   /// For more detail, please visit 'https://github.com/k-paxian/dart-json-mapper'
   DartJsonMapper,
 
+  /// Each model class must add annotation '@MappableClass()'
+  /// For more detail, please visit 'https://github.com/schultek/dart_mappable'
+  DartMappable,
+
   /// Parse on a separate isolate using `compute` (Flutter only).
   ///
   /// Each model class must define a top-level function, taking the form
@@ -375,6 +379,38 @@ class Part {
 
   // To identify the content type of a file
   final String? contentType;
+}
+
+/// Provides runtime metadata for a @Part annotation.
+/// Use this annotation to supply dynamic values like contentType or fileName
+/// that need to be determined at runtime rather than at compile time.
+///
+/// The parameter annotated with @PartMap should be a Map<String, dynamic>
+/// containing metadata for parts. Keys should be in the format:
+/// - `'partName_contentType'` for content type
+/// - `'partName_fileName'` for file name
+///
+/// Example:
+/// ```dart
+/// @POST('/upload')
+/// @MultiPart()
+/// Future<Response> upload({
+///   @Part(name: 'file') required File file,
+///   @PartMap() Map<String, dynamic>? partMetadata,
+/// });
+///
+/// // Usage:
+/// api.upload(
+///   file: myFile,
+///   partMetadata: {
+///     'file_contentType': 'image/jpeg',
+///     'file_fileName': 'photo.jpg',
+///   },
+/// );
+/// ```
+@immutable
+class PartMap {
+  const PartMap();
 }
 
 @immutable

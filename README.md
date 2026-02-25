@@ -17,7 +17,7 @@ Add the generator to your dev dependencies
 
 ```yaml
 dependencies:
-  retrofit: ^4.6.0
+  retrofit: ^4.9.0
   logger: ^2.6.0  # for logging purpose
   json_annotation: ^4.9.0
 
@@ -57,6 +57,39 @@ class Task {
 
   Map<String, dynamic> toJson() => _$TaskToJson(this);
 }
+```
+
+### Configuration
+
+You can customize the code generation behavior by creating a `build.yaml` file in your project root:
+
+```yaml
+targets:
+  $default:
+    builders:
+      retrofit_generator:
+        options:
+          # Control whether to add '// dart format off/on' comments (default: true)
+          format_output: true
+          # Enable automatic response type casting (default: true)
+          auto_cast_response: true
+          # Generate empty request body for methods without parameters (default: false)
+          empty_request_body: false
+          # Enable useResult annotation for methods (default: false)
+          use_result: false
+```
+
+#### format_output
+
+By default, retrofit_generator wraps the generated code with `// dart format off` and `// dart format on` comments to preserve the formatting. If you're combining retrofit with other generators (like riverpod) and need more control over formatting, you can disable this:
+
+```yaml
+targets:
+  $default:
+    builders:
+      retrofit_generator:
+        options:
+          format_output: false
 ```
 
 then run the generator
@@ -139,6 +172,49 @@ enum Status {
 Future<List<Task>> getTasksByStatus(@Path() Status status);
 ```
 
+#### Using dart_mappable
+
+You can use [dart_mappable](https://pub.dev/packages/dart_mappable) for type conversion by setting the parser to `Parser.DartMappable`:
+
+```dart
+@RestApi(
+  baseUrl: 'https://api.example.com',
+  parser: Parser.DartMappable,
+)
+abstract class ApiService {
+  factory ApiService(Dio dio) = _ApiService;
+
+  @GET('/tasks')
+  Future<List<Task>> getTasks();
+}
+
+@MappableClass()
+class Task with TaskMappable {
+  const Task({this.id, this.name});
+
+  final String? id;
+  final String? name;
+}
+```
+
+Don't forget to add the required dependencies:
+
+```yaml
+dependencies:
+  dart_mappable: ^4.2.0
+
+dev_dependencies:
+  dart_mappable_builder: ^4.2.0
+```
+
+And generate the code:
+
+```sh
+dart run build_runner build
+```
+
+For a complete example, see the [example_dartmappable](https://github.com/trevorwang/retrofit.dart/tree/master/example_dartmappable) directory.
+
 #### Typed extras
 If you want to add static extra to all requests.
 
@@ -202,6 +278,77 @@ The HTTP methods in the below sample are supported.
   Future<String> postUrlEncodedFormData(@Field() String hello);
 ```
 
+#### Runtime Content-Type for Multipart Uploads
+
+Use `@PartMap()` to provide runtime metadata (like `contentType` and `fileName`) for multipart file uploads:
+
+```dart
+  @POST('/api/files')
+  @MultiPart()
+  Future<void> uploadFile({
+    @Part(name: 'file') required File file,
+    @PartMap() Map<String, dynamic>? metadata,
+  });
+  
+  // Usage - Upload different file types to the same endpoint
+  
+  // Upload a JPEG image
+  await client.uploadFile(
+    file: File('/path/to/image.jpg'),
+    metadata: {
+      'file_contentType': 'image/jpeg',
+      'file_fileName': 'photo.jpg',
+    },
+  );
+  
+  // Upload a PDF document
+  await client.uploadFile(
+    file: File('/path/to/document.pdf'),
+    metadata: {
+      'file_contentType': 'application/pdf',
+      'file_fileName': 'report.pdf',
+    },
+  );
+```
+
+The `@PartMap()` annotation accepts a `Map<String, dynamic>` with keys in the format:
+- `'<partName>_contentType'` - Sets the content type for the part
+- `'<partName>_fileName'` - Sets the file name for the part
+
+**Fallback behavior:**
+- Runtime values from `@PartMap()` override static values from `@Part()` annotation
+- If `@PartMap()` value is not provided, uses static value from `@Part()` annotation
+- If neither is provided:
+  - `fileName` defaults to the file's actual name (extracted from file path)
+  - `contentType` defaults to `null` (Dio will auto-detect based on file extension)
+
+#### Dynamic Field Names for Multiple Files
+
+Use `@Part()` with `Map<String, File>` to upload multiple files with dynamic field names:
+
+```dart
+  @POST('/api/files')
+  @MultiPart()
+  Future<void> uploadFiles(@Part() Map<String, File> files);
+  
+  // Usage - Upload multiple files with custom field names
+  await client.uploadFiles({
+    'image[0]': File('/path/to/photo1.jpg'),
+    'image[1]': File('/path/to/photo2.jpg'),
+    'document': File('/path/to/report.pdf'),
+  });
+```
+
+This feature also supports:
+- `Map<String, MultipartFile>` - For files already wrapped in MultipartFile
+- `Map<String, List<int>>` - For raw byte data
+- Nullable maps: `Map<String, File>?`
+
+**Use cases:**
+- Uploading arrays of files where each file needs a unique indexed name (e.g., `image[0]`, `image[1]`)
+- Uploading files to endpoints that require specific field names determined at runtime
+- Sending multiple files of different types in a single request
+
 ### Get original HTTP response
 
 ```dart
@@ -211,6 +358,62 @@ The HTTP methods in the below sample are supported.
   @GET('/tasks')
   Future<HttpResponse<List<Task>>> getTasks();
 ```
+
+### Streaming and Server-Sent Events (SSE)
+
+Retrofit supports streaming responses using `@DioResponseType(ResponseType.stream)`. When using this annotation, the return type **must** be either `Stream<Uint8List>` (for raw bytes) or `Stream<String>` (for text).
+
+```dart
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:dio/dio.dart' hide Headers;
+import 'package:retrofit/retrofit.dart';
+
+@RestApi(baseUrl: 'https://api.example.com')
+abstract class RestClient {
+  factory RestClient(Dio dio, {String? baseUrl}) = _RestClient;
+
+  // For binary data (images, files, etc.)
+  @GET('/download/file')
+  @DioResponseType(ResponseType.stream)
+  Stream<Uint8List> downloadFile();
+
+  // For text data (SSE, NDJSON, etc.)
+  @GET('/events')
+  @DioResponseType(ResponseType.stream)
+  Stream<String> getServerSentEvents();
+}
+```
+
+**Note:** When using `Stream<String>`, make sure to import `dart:convert` in your source file.
+
+#### Server-Sent Events (SSE)
+
+For SSE support, you can use the [simple_sse](https://pub.dev/packages/simple_sse) package to parse the stream:
+
+```yaml
+dependencies:
+  simple_sse: ^2.0.0
+```
+
+```dart
+import 'package:simple_sse/simple_sse.dart';
+
+final client = RestClient(dio);
+
+// Get the string stream and transform it to SSE events
+final eventStream = client
+    .getServerSentEvents()
+    .transform(const LineSplitter())
+    .transform(const SseEventTransformer());
+
+await for (final event in eventStream) {
+  print('Event: ${event.event}');
+  print('Data: ${event.data}');
+  print('ID: ${event.id}');
+}
+```
+
 ### HTTP Header
 
 * Add a HTTP header from the parameter of the method
@@ -272,7 +475,7 @@ You can define headers at the `@RestApi` level that will be automatically includ
 
 ### Error Handling
 
-`catchError(Object)` should be used for capturing the exception and failed response. You can get the detailed response info from `DioError.response`.
+`catchError(Object)` can be used for capturing the exception and failed response. You can get the detailed response info from `DioError.response`.
 
 ```dart
 client.getTask('2').then((it) {
@@ -290,6 +493,46 @@ client.getTask('2').then((it) {
   }
 });
 ```
+
+
+Errors can also be caught and handled at the client level using CallAdapters. For example:
+
+```dart
+class ErrorAdapter<T> extends CallAdapter<Future<T>, Future<T>> {
+  @override
+  Future<T> adapt(Future<T> Function() call) {
+    try {
+      return call();
+    } catch (exception) {
+      // Handle the exception and throw whatever exception you want
+      throw MyCustomException();
+    }
+  }
+}
+
+@RestApi(callAdapter: ErrorAdapter)
+abstract class RestClient {
+  factory RestClient(Dio dio, {String? baseUrl}) = _RestClient;
+
+  @GET('/user')
+  Future<User> getUser();
+}
+```
+
+If you need to handle errors individually per API method instead of at the client level:
+
+``` dart
+@RestApi()
+abstract class RestClient {
+  factory RestClient(Dio dio, {String? baseUrl}) = _RestClient;
+
+  @GET('/user')
+  @UseCallAdapter(ErrorAdapter)
+  Future<User> getUser();
+}
+```
+
+
 
 ### Relative API baseUrl
 

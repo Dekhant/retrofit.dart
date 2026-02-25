@@ -1,3 +1,18 @@
+## 4.9.2
+- Add DartMappable parser support for dart_mappable package integration
+
+## 4.9.1
+- Make Response parameter in ParseErrorLogger callback optional for backward compatibility
+  - The `response` parameter in `logError` is now a named optional parameter `{Response? response}`
+  - This allows existing implementations without the response parameter to continue working
+
+## 4.9.0
+- Version bump to 4.9.0
+
+## 4.8.0
+- Add global headers support to @RestApi annotation
+- This version is required for retrofit_generator 10.1.0+
+
 ## 4.7.2
 - Add comments for each public methods
 - Enable linter rules for public api docs
