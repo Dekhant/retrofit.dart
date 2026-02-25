@@ -22,7 +22,9 @@ dependencies:
   lean_builder: ^0.1.6
   protobuf: ^6.0.0
   retrofit:
-    path: ../retrofit
+    git: 
+      url: https://github.com/Dekhant/retrofit.dart
+      path: generator
   source_gen: '>=3.1.0 <5.0.0'
 
 dev_dependencies:
